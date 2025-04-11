@@ -9,6 +9,7 @@ The following environment variables are required for the application to function
 -   `MONGO_CONNECTION_STRING`: The connection string for the MongoDB database. Example: `mongodb://localhost:27017/signature`.
 -   `CURRENT_SERVER_URL`: The URL of the current server. Example: `http://localhost:3000`.
 -   `INTERNAL_REQUEST_TOKEN`: A secret token used for internal requests. Example: `aaasdfasdf`.
+- `REDIS_PASSWORD`: The password for redis server.
 -   `NODE_ENV`: The environment the application is running in (e.g., `local`, `development`, `production`). Example: `local`.
 -   `FRONTEND_URL`: The URL of the frontend application. Example: `http://localhost:2001`.
 -   `EMAIL_HOST`: The host for the email server. Example: `smtp.ethereal.email`.
@@ -16,6 +17,7 @@ The following environment variables are required for the application to function
 -   `EMAIL_AUTH_USER`: The username for email server authentication. Example: `emil.oconnell@ethereal.email`.
 -   `EMAIL_AUTH_PASS`: The password for email server authentication. Example: `RTkeVn3y3V9bJbCrGg`.
 
+> ⚠️ Redis is required: Make sure Redis is installed and running on your machine. It is used for caching and session management within the application.
 Example `.env` file:
 
 MONGO_CONNECTION_STRING=mongodb://localhost:27017/test
