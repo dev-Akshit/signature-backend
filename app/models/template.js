@@ -59,6 +59,9 @@ export const schema = new mongoose.Schema({
         signedDate: {
             type: Date,
         },
+        signedPath: {
+            type: String,
+        },
         signStatus: {
             type: Number,
         },

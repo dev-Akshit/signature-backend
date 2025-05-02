@@ -10,9 +10,8 @@ export const findOne = (criteria, projection, options = {}) => {
 }
 
 export const updateOne = (criteria, updateObj, options = {}) => {
-    options.lean = true;
-    return model.findOneAndUpdate(criteria, updateObj, options);
-}
+    // options.lean = true;
+    return model.findOneAndUpdate(criteria, updateObj, { ...options, new: true, lean: true });}
 
 export const update = (criteria, updateObj, options = {}) => {
     options.lean = true;

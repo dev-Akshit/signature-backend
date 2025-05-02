@@ -6,3 +6,4 @@ data/document_tar/*
 data/request_document/*
 data/merged_document/*
 
+app/uploads

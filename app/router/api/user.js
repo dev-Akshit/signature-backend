@@ -8,7 +8,7 @@ import { bcryptPass, generatePassword } from "../../libs/encryption.js";
 import { sendNewUserEmail } from "../../libs/communication.js";
 const router = Router();
 
-router.get("/", checkLoginStatus, checkAdmin, async (req, res, next) => {
+router.get('/', checkLoginStatus, checkAdmin, async (req, res, next) => {
   try {
     const users = await userServices
       .find(
@@ -40,8 +40,27 @@ router.get("/", checkLoginStatus, checkAdmin, async (req, res, next) => {
   }
 });
 
+router.get('/officers', checkLoginStatus, async (req, res, next) => {
+  try {
+    const officers = await userServices.find({
+      role: roles.officer,
+      status: status.active,
+    });
+    // console.log('officers:', officers);
+    return res.json(officers.map(o => ({
+      id: o.id.toString(),
+      name: o.name,
+      email: o.email,
+    })));
+  } catch (error) {
+    console.error('GET /api/users/officers error:', error);
+    console.log("error: ",error)
+    next(error);
+  }
+});
+
 router.get(
-  "/:courtId",
+  '/:courtId',
   checkLoginStatus,
   checkAdmin,
   async (req, res, next) => {
@@ -79,7 +98,7 @@ router.get(
 );
 
 router.get(
-  "/:courtId/:userId",
+  '/:courtId/:userId',
   checkLoginStatus,
   checkAdmin,
   async (req, res, next) => {

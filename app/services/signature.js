@@ -24,3 +24,9 @@ export const update = (criteria, updateObj, options = {}) => {
 export const save = (saveObj) => {
     return new model(saveObj).save();
 }
+
+export const findAllByUser = (userId) => {
+    return model.find({
+        userId,
+    }).sort({ createdAt: -1 });
+}
