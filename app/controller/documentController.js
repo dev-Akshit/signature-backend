@@ -14,12 +14,12 @@ export const convertToPDF = async (req, res, next) => {
     const userRole = req.session.role;
     const userId = req.session.userId;
 
-    let filter = { _id: new mongoose.Types.ObjectId(id), status: { $ne: status.deleted } };
+    let filter = { _id: id, status: { $ne: status.deleted } };
     if (userRole === roles.reader) {
       filter.createdBy = userId;
     } else if (userRole === roles.officer) {
       filter = {
-        _id: new mongoose.Types.ObjectId(id),
+        _id: id,
         $or: [{ createdBy: userId }, { assignedTo: userId }],
         status: { $ne: status.deleted },
       };
@@ -57,9 +57,7 @@ export const uploadDocuments = async (req, res, next) => {
     const request = await templateServices.findOne({
       id,
       signStatus: signStatus.unsigned,
-      createdBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-        ? new mongoose.Types.ObjectId(req.session.userId)
-        : req.session.userId,
+      createdBy: req.session.userId,
       status: status.active,
     });
 
@@ -85,7 +83,7 @@ export const uploadDocuments = async (req, res, next) => {
     const files = Array.isArray(req.files) ? req.files : [];
 
     const mappedEntries = dataEntries.map((entry) => ({
-      id: new mongoose.Types.ObjectId(entry.id || undefined),
+      id: entry.id || undefined,
       url: files.find((f) => f.originalname === entry.url)?.path || entry.url || files[0]?.path,
       data: new Map(Object.entries(entry.data || {})),
       signStatus: entry.signStatus || signStatus.unsigned,
@@ -97,9 +95,7 @@ export const uploadDocuments = async (req, res, next) => {
       {
         $push: { data: { $each: mappedEntries } },
         $set: {
-          updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-            ? new mongoose.Types.ObjectId(req.session.userId)
-            : req.session.userId,
+          updatedBy: req.session.userId,
           updatedAt: new Date(),
         },
       }
@@ -110,18 +106,18 @@ export const uploadDocuments = async (req, res, next) => {
       title: updatedTemplate.templateName,
       documentCount: updatedTemplate.data.length,
       rejectedCount: updatedTemplate.data.filter((d) => d.signStatus === signStatus.rejected).length,
-      createdAt: updatedTemplate.createdAt.toISOString(),
+      createdAt: updatedTemplate.createdAt.toLocaleString(),
       status: updatedTemplate.signStatus,
       description: updatedTemplate.description || '',
       documents: updatedTemplate.data.map((d) => ({
         id: d.id.toString(),
         name: d.data.name || 'Document',
         filePath: d.url,
-        uploadedAt: d.createdAt?.toISOString() || updatedTemplate.createdAt.toISOString(),
-        signedDate: d.signedDate?.toISOString() || undefined,
+        uploadedAt: d.createdAt?.toLocaleString() || updatedTemplate.createdAt.toLocaleString(),
+        signedDate: d.signedDate?.toLocaleString() || undefined,
         signStatus: d.signStatus,
         data: Object.fromEntries(Object.entries(d.data || {})),
-    })),
+      })),
     });
   } catch (error) {
     console.error('POST /api/requests/:id/documents error:', error);
@@ -149,7 +145,10 @@ export const previewDocument = async (req, res, next) => {
     if (req.session.role === roles.reader) {
       query.createdBy = userObjectId;
     } else if (req.session.role === roles.officer) {
-      query.assignedTo = userObjectId;
+      query.$or = [
+        { assignedTo: userObjectId },
+        { createdBy: userObjectId }
+      ];
     }
     const request = await templateServices.findOne(query);
     if (!request) {
@@ -191,12 +190,14 @@ export const previewDocument = async (req, res, next) => {
 export const deleteDocument = async (req, res, next) => {
   try {
     const { id, documentId } = req.params;
+    const userId = req.session.userId
+    const userObjectId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : null;
     const request = await templateServices.findOne({
       id,
       signStatus: signStatus.unsigned,
-      createdBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-        ? new mongoose.Types.ObjectId(req.session.userId)
-        : req.session.userId,
+      createdBy: userObjectId,
       status: status.active,
     });
 
@@ -209,9 +210,7 @@ export const deleteDocument = async (req, res, next) => {
       {
         $pull: { data: { id: new mongoose.Types.ObjectId(documentId) } },
         $set: {
-          updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-            ? new mongoose.Types.ObjectId(req.session.userId)
-            : req.session.userId,
+          updatedBy: userObjectId,
           updatedAt: new Date(),
         },
       }

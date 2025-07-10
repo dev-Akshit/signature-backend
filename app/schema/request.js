@@ -9,6 +9,7 @@ export const requestSchema = Zod.object({
   status: Zod.number(),
   description: Zod.string().optional(),
   url: Zod.string().optional(),
+  rejectionReason: Zod.string().optional(),
   documents: Zod.array(
     Zod.object({
       id: Zod.string(),
@@ -18,6 +19,7 @@ export const requestSchema = Zod.object({
       signedDate: Zod.string().optional(),
       signStatus: Zod.number(),
       data: Zod.record(Zod.string(), Zod.any()),
+      rejectionReason: Zod.string().optional(),
     })
   ),
 });

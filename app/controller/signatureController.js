@@ -36,9 +36,7 @@ export const sendForSignature = async (req, res, next) => {
         const request = await templateServices.findOne({
             id,
             signStatus: signStatus.unsigned,
-            createdBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-                ? new mongoose.Types.ObjectId(req.session.userId)
-                : req.session.userId,
+            createdBy: req.session.userId,
             status: status.active,
         });
 
@@ -74,12 +72,14 @@ export const sendForSignature = async (req, res, next) => {
             {
                 $set: {
                     signStatus: signStatus.readForSign,
-                    assignedTo: mongoose.Types.ObjectId.isValid(officerId)
-                        ? new mongoose.Types.ObjectId(officerId)
-                        : officerId,
-                    updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-                        ? new mongoose.Types.ObjectId(req.session.userId)
-                        : req.session.userId,
+                    // assignedTo: mongoose.Types.ObjectId.isValid(officerId)
+                    //     ? new mongoose.Types.ObjectId(officerId)
+                    //     : officerId,
+                    // updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
+                    //     ? new mongoose.Types.ObjectId(req.session.userId)
+                    //     : req.session.userId,
+                    assignedTo: officerId,
+                    updatedBy: req.session.userId,
                     updatedAt: new Date(),
                 },
             }
@@ -90,14 +90,14 @@ export const sendForSignature = async (req, res, next) => {
             title: updatedTemplate.templateName,
             documentCount: updatedTemplate.data.length,
             rejectedCount: updatedTemplate.data.filter((d) => d.signStatus === signStatus.rejected).length,
-            createdAt: updatedTemplate.createdAt.toISOString(),
+            createdAt: updatedTemplate.createdAt.toLocaleString(),
             status: updatedTemplate.signStatus,
             description: updatedTemplate.description || '',
             documents: updatedTemplate.data.map((d) => ({
                 id: d.id.toString(),
                 name: d.data.name || 'Document',
                 filePath: d.url,
-                uploadedAt: d.createdAt?.toISOString() || updatedTemplate.createdAt.toISOString(),
+                uploadedAt: d.createdAt?.toLocaleString() || updatedTemplate.createdAt.toLocaleString(),
             })),
         });
     } catch (error) {
@@ -125,14 +125,10 @@ export const signRequest = async (req, res, next) => {
             return res.status(400).json({ error: 'SignatureId is required' });
         }
 
-        const userObjectId = mongoose.Types.ObjectId.isValid(userId)
-            ? new mongoose.Types.ObjectId(userId)
-            : null;
-
-        if (!userObjectId) {
+        if (!userId) {
             return res.status(400).json({ error: 'Invalid user ID format' });
         }
-        console.log('User Object ID:', userObjectId);
+        console.log('User Object ID:', userId);
 
         const query = {
             id,
@@ -145,6 +141,13 @@ export const signRequest = async (req, res, next) => {
             return res.status(404).json({ error: 'Request not found or not assigned to you' });
         }
 
+        console.log("created by user",request.createdBy);
+        console.log("session user id",userId);
+
+        if(request.createdBy.equals(new mongoose.Types.ObjectId(userId))){
+            return res.status(400).json({error: "Not allowed to sign"});
+        }
+
         if (!request.url) {
             return res.status(400).json({ error: 'No template file associated with this request' });
         }
@@ -155,12 +158,14 @@ export const signRequest = async (req, res, next) => {
         }
 
         const docxPath = path.resolve(__dirname, '../../', request.url);
+        console.log('Docx Path:', docxPath);
         if (!fs.existsSync(docxPath)) {
             return res.status(404).json({ error: 'Template file not found' });
         }
 
         // Create request-specific signed directory
         const signedDir = path.resolve(__dirname, '../uploads/signed', id);
+        console.log('Signed Directory:', signedDir);
         if (!fs.existsSync(signedDir)) {
             fs.mkdirSync(signedDir, { recursive: true });
         }
@@ -279,7 +284,7 @@ export const signRequest = async (req, res, next) => {
                     data: signedDocuments,
                     signStatus: signStatus.Signed,
                     updatedAt: new Date(),
-                    updatedBy: userObjectId,
+                    updatedBy: userId,
                 },
             }
         );
@@ -310,18 +315,16 @@ export const rejectRequest = async (req, res, next) => {
             return res.status(400).json({ error: 'Rejection reason is required and must be a non-empty string' });
         }
 
-        const userObjectId = mongoose.Types.ObjectId.isValid(req.session.userId)
-            ? new mongoose.Types.ObjectId(req.session.userId)
-            : null;
+        const userId = req.session.userId;
 
-        if (!userObjectId) {
+        if (!userId) {
             return res.status(400).json({ error: 'Invalid user ID format' });
         }
 
         const template = await templateServices.findOne({
             id,
             signStatus: signStatus.readForSign,
-            assignedTo: userObjectId,
+            assignedTo: userId,
             status: status.active,
         });
 
@@ -343,7 +346,7 @@ export const rejectRequest = async (req, res, next) => {
                     data: rejectedDocuments,
                     signStatus: signStatus.rejected,
                     rejectionReason: rejectionReason.trim(),
-                    updatedBy: userObjectId,
+                    updatedBy: userId,
                     updatedAt: new Date(),
                 },
             }
@@ -356,7 +359,7 @@ export const rejectRequest = async (req, res, next) => {
             title: template.templateName,
             documentCount: template.data.length,
             rejectedCount: rejectedDocuments.length,
-            createdAt: template.createdAt.toISOString(),
+            createdAt: template.createdAt.toLocaleString(),
             status: signStatus.rejected,
             rejectionReason: rejectionReason.trim(),
             description: template.description || '',
@@ -364,7 +367,7 @@ export const rejectRequest = async (req, res, next) => {
                 id: d.id.toString(),
                 name: d.data.name || 'Document',
                 filePath: d.url,
-                uploadedAt: d.createdAt?.toISOString() || template.createdAt.toISOString(),
+                uploadedAt: d.createdAt?.toLocaleString() || template.createdAt.toLocaleString(),
                 rejectionReason: d.rejectionReason,
                 rejectedDate: d.rejectedDate
             })),
@@ -380,7 +383,10 @@ export const getDocumentData = async (req, res, next) => {
         const { documentId } = req.params;
 
         const template = await templateServices.findOne(
-            { 'data.id': mongoose.Types.ObjectId.isValid(documentId) ? new mongoose.Types.ObjectId(documentId) : documentId },
+            // { 'data.id': mongoose.Types.ObjectId.isValid(documentId)
+            //     ? new mongoose.Types.ObjectId(documentId)
+            //     : documentId },
+            { 'data.id': documentId },
             { 'data.$': 1, templateName: 1, description: 1 }
         );
 
@@ -398,7 +404,7 @@ export const getDocumentData = async (req, res, next) => {
             templateName: template.templateName,
             description: template.description || '',
             data: document.data instanceof Map ? Object.fromEntries(document.data) : document.data || {},
-            signedDate: document.signedDate?.toISOString(),
+            signedDate: document.signedDate?.toLocaleString(),
             signedPath: document.signedPath || '',
             qrCodePath: document.qrCodePath || '',
         });
@@ -421,13 +427,9 @@ export const rejectDocument = async (req, res, next) => {
         const request = await templateServices.findOne({
             id,
             signStatus: signStatus.readForSign,
-            assignedTo: mongoose.Types.ObjectId.isValid(req.session.userId)
-                ? new mongoose.Types.ObjectId(req.session.userId)
-                : req.session.userId,
+            assignedTo: req.session.userId,
             status: status.active,
-            'data.id': mongoose.Types.ObjectId.isValid(documentId)
-                ? new mongoose.Types.ObjectId(documentId)
-                : documentId,
+            'data.id': documentId,
         });
 
         if (!request) {
@@ -437,18 +439,20 @@ export const rejectDocument = async (req, res, next) => {
         const updatedDocument = await templateServices.updateOne(
             {
                 id,
-                'data.id': mongoose.Types.ObjectId.isValid(documentId)
-                    ? new mongoose.Types.ObjectId(documentId)
-                    : documentId,
+                // 'data.id': mongoose.Types.ObjectId.isValid(documentId)
+                //     ? new mongoose.Types.ObjectId(documentId)
+                //     : documentId,
+                'data.id': documentId,
             },
             {
                 $set: {
                     'data.$.signStatus': signStatus.rejected,
                     'data.$.rejectionReason': rejectionReason.trim(),
                     'data.$.rejectedDate': new Date(),
-                    updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-                        ? new mongoose.Types.ObjectId(req.session.userId)
-                        : req.session.userId,
+                    // updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
+                    //     ? new mongoose.Types.ObjectId(req.session.userId)
+                    //     : req.session.userId,
+                    updatedBy: req.session.userId,
                     updatedAt: new Date(),
                 },
             }
@@ -472,9 +476,10 @@ export const delegateRequest = async (req, res, next) => {
         const template = await templateServices.findOne({
             id,
             signStatus: signStatus.readForSign,
-            assignedTo: mongoose.Types.ObjectId.isValid(req.session.userId)
-                ? new mongoose.Types.ObjectId(req.session.userId)
-                : req.session.userId,
+            // assignedTo: mongoose.Types.ObjectId.isValid(req.session.userId)
+            //     ? new mongoose.Types.ObjectId(req.session.userId)
+            //     : req.session.userId,
+            assignedTo: req.session.userId,
             status: status.active,
         });
 
@@ -490,13 +495,15 @@ export const delegateRequest = async (req, res, next) => {
             {
                 $set: {
                     signStatus: signStatus.delegated,
-                    delegatedTo: mongoose.Types.ObjectId.isValid(readerId)
-                        ? new mongoose.Types.ObjectId(readerId)
-                        : readerId,
+                    // delegatedTo: mongoose.Types.ObjectId.isValid(readerId)
+                    //     ? new mongoose.Types.ObjectId(readerId)
+                    //     : readerId,
+                    deligatedTo: readerId,
                     // delegationReason: req.body.reason || 'No reason provided',
-                    updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-                        ? new mongoose.Types.ObjectId(req.session.userId)
-                        : req.session.userId,
+                    // updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
+                    //     ? new mongoose.Types.ObjectId(req.session.userId)
+                    //     : req.session.userId,
+                    updatedBy: req.session.userId,
                     updatedAt: new Date(),
                 },
             }
@@ -507,14 +514,14 @@ export const delegateRequest = async (req, res, next) => {
             title: updatedRequest.templateName,
             documentCount: updatedRequest.data.length,
             rejectedCount: updatedRequest.data.filter(d => d.signStatus === signStatus.rejected).length,
-            createdAt: updatedRequest.createdAt.toISOString(),
+            createdAt: updatedRequest.createdAt.toLocaleString(),
             status: updatedRequest.signStatus,
             description: updatedRequest.description || '',
             documents: updatedRequest.data.map(d => ({
                 id: d.id.toString(),
                 name: 'Document',
                 filePath: d.url,
-                uploadedAt: d.createdAt?.toISOString() || updatedRequest.createdAt.toISOString(),
+                uploadedAt: d.createdAt?.toLocaleString() || updatedRequest.createdAt.toLocaleString(),
             })),
         });
     } catch (error) {

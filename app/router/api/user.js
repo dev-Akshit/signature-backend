@@ -47,7 +47,7 @@ router.get('/officers', checkLoginStatus, async (req, res, next) => {
       status: status.active,
     });
     // console.log('officers:', officers);
-    return res.json(officers.map(o => ({
+    return res.json(officers.filter(o => o.id != req.session.userId).map(o => ({
       id: o.id.toString(),
       name: o.name,
       email: o.email,

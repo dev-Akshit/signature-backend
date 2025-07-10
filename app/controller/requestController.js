@@ -41,12 +41,8 @@ export const createRequest = async (req, res, next) => {
       templateName: title,
       description: description || '',
       templateVariables,
-      createdBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-        ? new mongoose.Types.ObjectId(req.session.userId)
-        : req.session.userId,
-      updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-        ? new mongoose.Types.ObjectId(req.session.userId)
-        : req.session.userId,
+      createdBy: req.session.userId,
+      updatedBy: req.session.userId,
       data: [],
     };
 
@@ -57,7 +53,7 @@ export const createRequest = async (req, res, next) => {
       title: request.templateName,
       documentCount: request.data.length,
       rejectedCount: 0,
-      createdAt: request.createdAt.toISOString(),
+      createdAt: request.createdAt.toLocaleString(),
       status: request.signStatus,
       url: request.url ? `/Uploads/templates/${file.filename}` : '',
       description: request.description,
@@ -82,13 +78,12 @@ export const getAllRequests = async (req, res, next) => {
     };
 
     if (req.session.role === roles.reader) {
-      query.createdBy = mongoose.Types.ObjectId.isValid(userId)
-        ? new mongoose.Types.ObjectId(userId)
-        : userId;
+      query.createdBy = userId;
     } else if (req.session.role === roles.officer) {
-      query.assignedTo = mongoose.Types.ObjectId.isValid(userId)
-        ? new mongoose.Types.ObjectId(userId)
-        : userId;
+      query.$or = [
+        { assignedTo: userId },
+        { createdBy: userId }
+      ];
     }
 
     if (req.query.search) {
@@ -103,18 +98,20 @@ export const getAllRequests = async (req, res, next) => {
         title: r.templateName,
         documentCount: r.data.length,
         rejectedCount: r.data.filter((d) => d.signStatus === signStatus.rejected).length,
-        createdAt: r.createdAt.toISOString(),
+        createdAt: r.createdAt.toLocaleString(),
         status: r.signStatus,
         description: r.description || '',
-        rejectionReason: r.rejectionReason || '',
+        rejectionReason: r.rejectionReason,
+        createdBy: r.createdBy,
         documents: r.data.map((d) => ({
           id: d.id.toString(),
           name: d?.data?.name || 'Document',
           filePath: d.url,
-          uploadedAt: d.createdAt?.toISOString() || r.createdAt.toISOString(),
+          uploadedAt: d.createdAt?.toLocaleString() || r.createdAt.toLocaleString(),
           signStatus: d.signStatus,
-          signedDate: d.signedDate?.toISOString(),
+          signedDate: d.signedDate?.toLocaleString(),
           data: d.data && typeof d.data === 'object' ? d.data : {},
+          rejectionReason: d.rejectionReason,
         })),
       }))
     );
@@ -149,7 +146,10 @@ export const getRequestById = async (req, res, next) => {
     if (req.session.role === roles.reader) {
       query.createdBy = userObjectId;
     } else if (req.session.role === roles.officer) {
-      query.assignedTo = userObjectId;
+      query.$or = [
+        { assignedTo: userId },
+        { createdBy: userId }
+      ];
     }
 
     const request = await templateServices.findOne(query);
@@ -161,10 +161,11 @@ export const getRequestById = async (req, res, next) => {
       id: d.id.toString(),
       name: d?.data?.name || 'Document',
       filePath: d.url,
-      uploadedAt: d.createdAt?.toISOString() || request.createdAt.toISOString(),
+      uploadedAt: d.createdAt?.toLocaleString() || request.createdAt.toLocaleString(),
       signStatus: d.signStatus,
-      signedDate: d.signedDate?.toISOString(),
+      signedDate: d.signedDate?.toLocaleString(),
       data: d.data instanceof Map ? Object.fromEntries(d.data) : d.data || {},
+      rejectionReason: d.rejectionReason || '',
     }));
 
     return res.json({
@@ -172,7 +173,8 @@ export const getRequestById = async (req, res, next) => {
       title: request.templateName,
       documentCount: request.data?.length || 0,
       rejectedCount: (request.data || []).filter((d) => d.signStatus === signStatus.rejected).length,
-      createdAt: request.createdAt.toISOString(),
+      createdAt: request.createdAt.toLocaleString(),
+      createdBy: request.createdBy,
       status: request.signStatus,
       url: request.url ? `/Uploads/templates/${path.basename(request.url)}` : '',
       description: request.description || '',
@@ -205,12 +207,8 @@ export const cloneRequest = async (req, res, next) => {
       templateName: `${request.templateName} (Clone)`,
       description: request.description || '',
       templateVariables: request.templateVariables || [],
-      createdBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-        ? new mongoose.Types.ObjectId(req.session.userId)
-        : req.session.userId,
-      updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-        ? new mongoose.Types.ObjectId(req.session.userId)
-        : req.session.userId,
+      createdBy: req.session.userId,
+      updatedBy: req.session.userId,
       data: [],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -223,7 +221,7 @@ export const cloneRequest = async (req, res, next) => {
       title: clonedRequest.templateName,
       documentCount: clonedRequest.data.length,
       rejectedCount: 0,
-      createdAt: clonedRequest.createdAt.toISOString(),
+      createdAt: clonedRequest.createdAt.toLocaleString(),
       status: clonedRequest.signStatus,
       description: clonedRequest.description || '',
       documents: [],
@@ -240,9 +238,10 @@ export const deleteRequest = async (req, res, next) => {
     const template = await templateServices.findOne({
       id,
       signStatus: signStatus.unsigned,
-      createdBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-        ? new mongoose.Types.ObjectId(req.session.userId)
-        : req.session.userId,
+      // createdBy: mongoose.Types.ObjectId.isValid(req.session.userId)
+      //   ? new mongoose.Types.ObjectId(req.session.userId)
+      //   : req.session.userId,
+      createdBy: req.session.userId,
       status: status.active,
     });
 
@@ -255,9 +254,10 @@ export const deleteRequest = async (req, res, next) => {
       {
         $set: {
           status: status.deleted,
-          updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
-            ? new mongoose.Types.ObjectId(req.session.userId)
-            : req.session.userId,
+          // updatedBy: mongoose.Types.ObjectId.isValid(req.session.userId)
+          //   ? new mongoose.Types.ObjectId(req.session.userId)
+          //   : req.session.userId,
+          updatedBy: req.session.userId,
           updatedAt: new Date(),
         },
       }
@@ -315,43 +315,43 @@ export const printRequest = async (req, res, next) => {
 };
 
 export const downloadZip = async (req, res, next) => {
-    try {
-        const { id } = req.params;
-        const request = await templateServices.findOne({
-            id,
-            status: status.active,
-            signStatus: signStatus.Signed,
-        });
+  try {
+    const { id } = req.params;
+    const request = await templateServices.findOne({
+      id,
+      status: status.active,
+      signStatus: signStatus.Signed,
+    });
 
-        if (!request) {
-            return res.status(404).json({ error: 'Request not found or not signed' });
-        }
-
-        const signedDir = path.resolve(__dirname, '../Uploads/signed', id);
-        if (!fs.existsSync(signedDir)) {
-            return res.status(404).json({ error: 'No signed documents found' });
-        }
-
-        const signedFiles = fs.readdirSync(signedDir).filter(file => file.endsWith('_signed.pdf'));
-        if (signedFiles.length === 0) {
-            return res.status(404).json({ error: 'No signed PDFs available' });
-        }
-
-        // Create a ZIP archive
-        const archive = archiver('zip', { zlib: { level: 9 } });
-        res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename=${id}_signed_documents.zip`);
-
-        archive.pipe(res);
-
-        signedFiles.forEach(file => {
-            const filePath = path.join(signedDir, file);
-            archive.file(filePath, { name: file });
-        });
-
-        await archive.finalize();
-    } catch (error) {
-        console.error('POST /api/requests/:id/download-zip error:', error);
-        next(error);
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found or not signed' });
     }
+
+    const signedDir = path.resolve(__dirname, '../Uploads/signed', id);
+    if (!fs.existsSync(signedDir)) {
+      return res.status(404).json({ error: 'No signed documents found' });
+    }
+
+    const signedFiles = fs.readdirSync(signedDir).filter(file => file.endsWith('_signed.pdf'));
+    if (signedFiles.length === 0) {
+      return res.status(404).json({ error: 'No signed PDFs available' });
+    }
+
+    // Create a ZIP archive
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename=${id}_signed_documents.zip`);
+
+    archive.pipe(res);
+
+    signedFiles.forEach(file => {
+      const filePath = path.join(signedDir, file);
+      archive.file(filePath, { name: file });
+    });
+
+    await archive.finalize();
+  } catch (error) {
+    console.error('POST /api/requests/:id/download-zip error:', error);
+    next(error);
+  }
 };

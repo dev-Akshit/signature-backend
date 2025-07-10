@@ -21,7 +21,7 @@ router.get('/:id', checkLoginStatus, requestController.getRequestById);
 router.post('/:id/clone', checkLoginStatus, requestController.cloneRequest);
 router.post('/:id/print', checkLoginStatus, requestController.printRequest);
 router.post('/:id/download-zip', checkLoginStatus, requestController.downloadZip);
-router.delete('/:id', checkLoginStatus, checkReader, requestController.deleteRequest);
+router.delete('/:id', checkLoginStatus, requestController.deleteRequest);
 
 
 // Document Routes
@@ -29,16 +29,18 @@ router.get('/:id/pdf', checkLoginStatus, documentController.convertToPDF);
 router.post(
   '/:id/documents',
   checkLoginStatus,
-  checkReader,
+  // checkReader,
   requestUpload.array('documents', 100),
   documentController.uploadDocuments
 );
 router.get('/:id/documents/:documentId/preview', checkLoginStatus, documentController.previewDocument);
-router.delete('/:id/documents/:documentId', checkLoginStatus, checkReader, documentController.deleteDocument);
+router.delete('/:id/documents/:documentId', checkLoginStatus, documentController.deleteDocument);
 
 // Signature Routes
-router.get('/documents/:documentId',checkLoginStatus, signatureController.getDocumentData);
-router.post('/:id/send', checkLoginStatus, checkReader, signatureController.sendForSignature);
+router.get('/documents/:documentId', checkLoginStatus, signatureController.getDocumentData);
+router.post('/:id/send', checkLoginStatus,
+  //  checkReader,
+  signatureController.sendForSignature);
 router.post('/:id/sign', checkLoginStatus, signatureController.signRequest);
 router.post('/:id/reject', checkLoginStatus, checkOfficer, signatureController.rejectRequest);
 router.post('/:id/documents/:documentId/reject', checkLoginStatus, checkOfficer, signatureController.rejectDocument);
