@@ -7,6 +7,11 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { convertAsync } from '../libs/utils.js';
 import { roles, status, signStatus } from '../constants/index.js';
+// import {Queue, Worker} from 'bullmq';
+// import Redis from 'ioredis'
+
+// const redisConnection = new Redis({host: 'redis', port: 6379});
+// const docQueue = new Queue('document-generation', {connection: redisConnection});
 
 export const convertToPDF = async (req, res, next) => {
   try {
@@ -50,6 +55,80 @@ export const convertToPDF = async (req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// export const uploadDocuments = async (req, res, next) => {
+//   try {
+//     const id = req.params.id;
+//     const request = await templateServices.findOne({
+//       id,
+//       signStatus: signStatus.unsigned,
+//       createdBy: req.session.userId,
+//       status: status.active,
+//     });
+
+//     if (!request) {
+//       return res.status(404).json({ error: 'Request not found or unauthorized' });
+//     }
+
+//     const dataEntries = typeof req.body.dataEntries === 'string'
+//       ? JSON.parse(req.body.dataEntries)
+//       : req.body.dataEntries || [];
+
+//     const body = await DocumentUploadSchema.safeParseAsync({
+//       documents: req.files,
+//       dataEntries,
+//     });
+
+//     if (!body.success) {
+//       return res.status(400).json({
+//         error: 'Invalid payload',
+//         detailed: body.error,
+//       });
+//     }
+
+//     const chunkSize = 1000;
+//     const chunks = [];
+//     for (let i = 0; i < dataEntries.length; i += chunkSize) {
+//       chunks.push(dataEntries.slice(i, i + chunkSize));
+//     }
+
+//     for (const chunk of chunks) {
+//       await docQueue.add('generate', {
+//         id,
+//         templatePath: request.url,
+//         dataEntries: chunk,
+//         userId: req.session.userId,
+//       });
+//     }
+
+//     // Fetch updated data (after queuing jobs — workers will populate URLs)
+//     const updatedTemplate = await templateServices.findOne({ id });
+
+//     return res.json({
+//       id: updatedTemplate.id.toString(),
+//       title: updatedTemplate.templateName,
+//       documentCount: updatedTemplate.data.length,
+//       rejectedCount: updatedTemplate.data.filter(
+//         (d) => d.signStatus === signStatus.rejected
+//       ).length,
+//       createdAt: updatedTemplate.createdAt.toLocaleString(),
+//       status: updatedTemplate.signStatus,
+//       description: updatedTemplate.description || '',
+//       documents: updatedTemplate.data.map((d) => ({
+//         id: d.id.toString(),
+//         name: d.data?.name || 'Document',
+//         filePath: d.url,
+//         uploadedAt: d.createdAt?.toLocaleString() || updatedTemplate.createdAt.toLocaleString(),
+//         signedDate: d.signedDate?.toLocaleString() || undefined,
+//         signStatus: d.signStatus,
+//         data: Object.fromEntries(Object.entries(d.data || {})),
+//       })),
+//     });
+//   } catch (error) {
+//     console.error('POST /api/requests/:id/documents error:', error);
+//     next(error);
+//   }
+// };
 
 export const uploadDocuments = async (req, res, next) => {
   try {

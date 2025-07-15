@@ -2,12 +2,15 @@ import { createServer } from 'http';
 import argvMap from './app/libs/argvMap.js';
 import './app/config/env.js';
 import mongoose from './app/config/mongoose.js';
+import { setIO } from './app/libs/utils.js';
+import { signWorker } from './app/worker/signWorker.js';
 
 import { createSocketServer } from './app/config/socket.js';
 import app, { sessionMiddleware } from './app/index.js';
 
 const server = createServer(app);
 const io = createSocketServer(server);
+setIO(io);
 io.engine.use(sessionMiddleware);
 
 const port = argvMap.get('port') ?? 3000;
