@@ -5,6 +5,7 @@ import { userServices } from '../services/index.js';
 import { roles, status, signStatus } from '../constants/index.js';
 import { Queue } from 'bullmq';
 import Redis from 'ioredis';
+import { getIO } from '../libs/utils.js';
 
 const redisConnection = new Redis({ host: 'localhost', port: 6379 });
 const signQueue = new Queue('sign-request', { connection: redisConnection });
@@ -117,6 +118,7 @@ export const signRequest = async (req, res, next) => {
 
 export const rejectRequest = async (req, res, next) => {
     try {
+        let io = getIO();
         const id = req.params.id;
         const { rejectionReason } = req.body;
         console.log('Reject request received:', { id, rejectionReason });
@@ -158,6 +160,12 @@ export const rejectRequest = async (req, res, next) => {
                 },
             }
         );
+
+        io.emit('requestStatusUpdate', {
+            requestId: id,
+            status: 'rejected',
+            rejectionReason: rejectionReason.trim(),
+        });
 
         return res.json({
             id: template.id.toString(),
